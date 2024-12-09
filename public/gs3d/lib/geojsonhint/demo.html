@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>checkGeoJSON</title>
+</head>
+<style>
+  body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0 auto;
+  }
+
+  #container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+  }
+</style>
+<script src="./geojsonhint.js"></script>
+
+<body>
+  <div id="container">
+    <textarea id="geojson-input" cols="30" rows="10"></textarea>
+    <button id="geojson-check">geojson-check</button>
+    <div id="geojson-error"></div>
+  </div>
+</body>
+<script>
+  (() => {
+    // let { geojsonhint } = gs3d.util
+    // console.log(geojsonhint);
+
+    // 设置默认测试数据 并 设置textarea标签更新
+    let point = {
+      type: "Point",
+      coordinates: [-105.01621, 39.57422],
+    };
+    let domInput = document.getElementById("geojson-input");
+    domInput.innerHTML = JSON.stringify(point);
+    let errorDom = document.getElementById("geojson-error");
+    domInput.addEventListener('change', function (e) {
+      domInput.innerHTML = e.target.value
+    })
+
+    // geojson-check
+    const check = function check () {
+      let data = domInput.innerHTML;
+      let errors = geojsonhint.hint(data);
+      if (errors.length > 0) {
+        let message = errors
+          .map(function (error) {
+            return error.message;
+          })
+          .join("<br>");
+        errorDom.innerHTML = 'Invalid GeoJSON<br>' + message;
+      } else {
+        errorDom.innerHTML = "Valid GeoJSON";
+      }
+    };
+    let checkDom = document.getElementById("geojson-check");
+    checkDom.addEventListener("click", () => {
+      check();
+    });
+  })()
+</script>
+
+</html>

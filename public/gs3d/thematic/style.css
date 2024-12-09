@@ -1,0 +1,35 @@
+.chart-detail {
+  position: absolute;
+  z-index: 2000;
+
+  background-color: white;
+  padding: 5px 10px;
+  border-radius: 2px;
+}
+.chart-legend {
+  position: absolute;
+  right: 10px;
+  bottom: 40px;
+  z-index: 2000;
+
+  display: flex;
+  background-color: white;
+  padding: 5px;
+  border-radius: 2px;
+  flex-direction: column;
+}
+.chart-legend-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  margin: 5px;
+}
+.chart-legend-color {
+  width: 30px;
+  height: 12px;
+  margin-right: 10px;
+}
+.chart-legend-text {
+  font-size: 12px;
+}

@@ -1,0 +1,43 @@
+{
+    "geometry": {
+        "coordinates": [
+            125.41157875619018,
+            43.8211057115796,
+            10.5
+        ],
+        "type": "Point"
+    },
+    "properties": {
+        "id": "0157v4jfBZG",
+        "type": "videoShed",
+        "icon": "play-square",
+        "schemeName": "camera",
+        "options": {
+            "url": "https://open.ys7.com/v3/openlive/D23371381_8_2.m3u8?expire=1691546700&id=608963869536169984&t=78768c54cbe5a26ea4d6a6892c8dd5eaafff8e71edac2c1ab5102510c703aa2c&ev=100",
+            
+            "videoId": "0157v4jfBZG",
+            "live": true,
+            "position": {
+                "longitude": 125.41157875619018,
+                "latitude": 43.8211057115796,
+                "height": 10.5
+            },
+            "rotation": {
+                "pitch": -7.8,
+                "heading": -38.4
+            },
+            "far": 126,
+            "debugFrustum": true,
+            "alpha": 0.6,
+            "near": 0,
+            "fov": 57,
+            "color": {
+                "red": 1,
+                "green": 0,
+                "blue": 0,
+                "alpha": 1
+            }
+        }
+    },
+    "type": "Feature"
+}

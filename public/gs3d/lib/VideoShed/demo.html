@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>视频融合</title>
+  <style>
+    body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+    }
+  </style>
+</head>
+<link rel="stylesheet" href="https://www.unpkg.com/cesium@1.101.0/Build/Cesium/Widgets/widgets.css" />
+<link rel="stylesheet" href="./style.css" />
+<script src="https://www.unpkg.com/cesium@1.101.0/Build/Cesium/Cesium.js"></script>
+<link rel="stylesheet" href="./lib/element-ui@2.14.1/index.css" />
+<script src="./lib/element-ui@2.14.1/index.js"></script>
+<script src="./lib/jquery.min.js"></script>
+<script src="./lib/ezuikit.js"></script>
+<script src="./lib/vue.min.js"></script>
+
+<body>
+  <div id="app" class="full-screen">
+    <!-- v-loading="loading"
+    :element-loading-text="loadingText"
+    element-loading-spinner="el-icon-loading"
+    element-loading-background="rgba(0, 0, 0, 0.8)" -->
+    <div id="earth" class="full-screen"></div>
+    <div class="active-btn">
+      <!-- <el-button type="primary" size="small" @click="drawPolygon()"
+          >多边形</el-button
+        > -->
+      <el-button type="primary" size="small" @click="handleDraw()">绘制</el-button>
+      <!-- <el-button type="primary" size="small" @click="pick()"
+          >拾取位置</el-button
+        > -->
+      <el-button type="primary" size="small" @click="handleFlyTo()">定位范围</el-button>
+      <el-checkbox v-model="debugFrustum" @change="v=>{handleSliderAfterChange(v, 'debugFrustum')}">视锥</el-checkbox>
+
+      <!-- 位置 -->
+      <div class="block">
+        <span class="label">经度偏移</span>
+        <el-slider class="slider" :min="-.0001" :max=".0001" :step="0.000001" v-model="x" @change="handlePositionChange"
+                   @input="v =>{handleLonlatChange(v, 'x')}"></el-slider>
+        <span class="demonstration">{{position.longitude}}</span>
+      </div>
+      <div class="block">
+        <span class="label">纬度偏移</span>
+        <el-slider class="slider" :min="-.0001" :max=".0001" :step="0.000001" v-model="y" @change="handlePositionChange"
+                   @input="v =>{handleLonlatChange(v, 'y')}"></el-slider>
+        <span class="demonstration">{{position.latitude}}</span>
+      </div>
+      <div class="block">
+        <span class="label">视角高度</span>
+        <el-slider class="slider" :min="-10" :max="10" :step="0.1" v-model="z" @change="handlePositionChange"
+                   @input="v =>{handleLonlatChange(v, 'z')}"></el-slider>
+        <span class="demonstration">{{position.height}}</span>
+      </div>
+      <div class="block">
+        <span class="label">投射深度</span>
+        <el-slider class="slider" :min="9" :max="999" v-model="far"
+                   @input="v =>{handleSliderAfterChange(v, 'far')}"></el-slider>
+        <span class="demonstration">{{far}}</span>
+      </div>
+      <div class="block">
+        <span class="label">透明度</span>
+        <el-slider class="slider" :min="0" :max="1" :step="0.05" v-model="alpha"
+                   @input="v =>{handleSliderAfterChange(v, 'alpha')}"></el-slider>
+        <span class="demonstration">{{alpha}}</span>
+      </div>
+      <!-- 变换参数 -->
+      <div class="block">
+        <span class="label">宽高比</span>
+        <el-slider class="slider" :min=".1" :max="3" :step="0.05" v-model="aspectRatio"
+                   @input="v =>{handleSliderAfterChange(v, 'aspectRatio')}"></el-slider>
+        <span class="demonstration">{{aspectRatio}}</span>
+      </div>
+      <div class="block">
+        <span class="label">视野角度</span>
+        <el-slider class="slider" :min="10" :max="180" :step="0.05" v-model="fov"
+                   @input="v =>{handleSliderAfterChange(v, 'fov')}"></el-slider>
+        <span class="demonstration">{{fov}}</span>
+      </div>
+      <!-- 旋转参数 -->
+      <div class="block">
+        <span class="label">纵向角度</span>
+        <el-slider class="slider" :min="-180" :max="180" :step="0.005" v-model="pitch"
+                   @input="v =>{handleRotationChange(v)}"></el-slider>
+        <span class="demonstration">{{pitch}}</span>
+      </div>
+      <div class="block">
+        <span class="label">横向角度</span>
+        <el-slider class="slider" :min="-180" :max="180" :step="0.005" v-model="heading"
+                   @input="v =>{handleRotationChange(v)}"></el-slider>
+        <span class="demonstration">{{heading}}</span>
+      </div>
+    </div>
+
+    <div id="videos"></div>
+  </div>
+</body>
+<script type="module">
+  import VideoShed from "./VideoShed.js";
+  (function () {
+    let earth = null;
+    let viewer = null;
+    // let measure = null;
+    let videoShed = null;
+
+    // var dm = null;
+    var polygons = [];
+
+    let vue = new Vue({
+      el: "#app",
+      data () {
+        return {
+          // loading: true,
+          // loadingText: "拼命加载中",
+
+          x: 0,
+          y: 0,
+          z: 0,
+
+          videoId: "",
+          position: { longitude: 0, latitude: 0, height: 0 },
+          far: 99,
+          aspectRatio: 1,
+          fov: 60, // 视野角度
+          pitch: 0,
+          heading: 0,
+          alpha: 1,
+          debugFrustum: true,
+          live: false,
+        };
+      },
+      methods: {
+        // pick() {
+        //   let me = this;
+        //   measure
+        //     .pickPosition()
+        //     .then((position) => {
+        //       me.position.longitude = position.longitude;
+        //       me.position.latitude = position.latitude;
+        //       me.handlePositionChange();
+        //     })
+        //     .catch(() => {
+        //       this.$message("取消！");
+        //     });
+        // },
+        handleDraw () {
+          const options = {
+            videoId: this.videoId,
+            far: 99,
+            aspectRatio: 1,
+            fov: 60, // 视野角度
+            pitch: 0,
+            heading: 0,
+            alpha: 1,
+            debugFrustum: true,
+            live: true,
+            url: "https://open.ys7.com/v3/openlive/D23371381_8_2.m3u8?expire=1690942607&id=606430120515194880&t=a950122953e6011b44e2a8434d27ef5da19718c91bd2e2f8f6041a27edb7960f&ev=100",
+          };
+
+          videoShed.draw(options).then(() => {
+            let _options = videoShed.options;
+            let { x, y, z } = _options.position;
+
+            vue.position = { longitude: x, latitude: y, height: z };
+            vue.pitch = _options.rotation.x;
+            vue.heading = _options.rotation.y;
+            vue.live = _options.live;
+            vue.far = _options.far;
+            vue.near = _options.near;
+            vue.fov = _options.fov;
+            vue.alpha = _options.alpha;
+            vue.debugFrustum = _options.debugFrustum;
+          });
+        },
+        handleLonlatChange (v, key) {
+          let { longitude, latitude, height } = this.position;
+          let _longitude = longitude;
+          let _latitude = latitude;
+          let _height = height;
+
+          if (key === "x") {
+            _longitude += v;
+          } else if (key === "y") {
+            _latitude += v;
+          } else if (key === "z") {
+            _height += v;
+          }
+
+          let c3 = new Cesium.Cartesian3(_longitude, _latitude, _height);
+          if (videoShed) {
+            videoShed.position = c3;
+          }
+        },
+        handleFlyTo () {
+          videoShed.flyTo();
+        },
+        handleSliderAfterChange (value, name) {
+          console.log(`${name} slider `, value);
+          if (videoShed) {
+            videoShed[name] = value;
+          }
+        },
+        handleRotationChange (value) {
+          let rotation = {
+            x: this.pitch,
+            y: this.heading,
+          };
+          if (videoShed) {
+            videoShed.changeRotation = rotation;
+          }
+        },
+        handlePositionChange () {
+          this.position.longitude += this.x;
+          this.position.latitude += this.y;
+          this.position.height += this.z;
+          let { longitude, latitude, height } = this.position;
+          let c3 = new Cesium.Cartesian3(longitude, latitude, height);
+          if (videoShed) {
+            videoShed.position = c3;
+          }
+          this.x = 0;
+          this.y = 0;
+          this.z = 0;
+        },
+
+        // drawPolygon() {
+        //   // viewer.scene.globe.depthTestAgainstTerrain = false;
+        //   dm.drawPolygon((positions, entities) => {
+        //     let _entitys = entities.map((entity, index) => {
+        //       let _clone = Cesium.clone(entity);
+        //       return _clone;
+        //     });
+
+        //     dm.remove();
+        //     _entitys.map((e) => {
+        //       viewer.entities.add(e);
+        //     });
+        //     polygons = polygons.concat(_entitys);
+        //   });
+        // },
+      },
+    });
+
+    // vue.loadingText = "拼命加载中";
+
+    Cesium.Ion.defaultAccessToken =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlMmIzZjlhMy1kNzU1LTRmMmQtYTFkNi1jMWQ5NTliM2RmN2YiLCJpZCI6MjU5LCJpYXQiOjE2OTM1ODIzNDJ9.-Tpp8s9ismoMrkKqnNsHFEMZgXDfa2uZfBQRE-kn3gM";
+    earth = new Cesium.Viewer("earth", {
+      shouldAnimate: true,
+      showFPS: true,
+    });
+    viewer = earth;
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    handleRender();
+
+    // earth = new Earth();
+    // earth
+    //   .create("earth", {
+    //     // baseLayerPicker: true,
+    //     shouldAnimate: true,
+    //     showFPS: true,
+    //   })
+    //   .then((_v) => {
+    //     // vue.loading = false;
+    //     viewer = _v;
+    //     viewer.scene.globe.depthTestAgainstTerrain = true;
+
+    //     // dm = earth.drawManager;
+    //     // measure = new Earth.Measure(_v);
+
+    //     let layerid = "china15";
+    //     let china = {
+    //       layerid,
+    //       type: earth.layersManager.serverTypes.UrlTemplateImageryProvider,
+    //       tilingScheme:
+    //         earth.layersManager.tilingSchemeTypes.WebMercatorTilingScheme,
+    //       imageryType: earth.layersManager.imageryTypes.imagery,
+    //       maximumLevel: 14, //最大缩放级别
+    //       url: "http://192.168.1.90:8088/data/gis/dom/china15/{z}/{x}_{y}.png",
+    //     };
+    //     let offline = earth.layersManager.loadServerTypeMap(
+    //       "china-offline",
+    //       "china15",
+    //       china
+    //     );
+    //     handleRender();
+    //   });
+
+    function handleRender () {
+      $.getJSON("./camera.json", (feature) => {
+        let { id, icon, schemeName, options } = feature.properties;
+        videoShed = new VideoShed(viewer);
+        if (options.live) {
+          videoShed.createVideoEle(options.url, id);
+          var player = new EZUIKit.EZUIPlayer(id);
+        }
+
+        videoShed.instance(options);
+        vue.videoId = options.videoId;
+        vue.position = options.position;
+        vue.live = options.live;
+        vue.far = options.far;
+        vue.near = options.near;
+        vue.fov = options.fov;
+        vue.alpha = options.alpha;
+        vue.debugFrustum = options.debugFrustum;
+
+        videoShed.flyTo();
+      });
+    }
+  })();
+</script>
+<!-- <script type="module">
+    import { VideoShed } from "./index.js";
+
+    console.log(VideoShed);
+  </script> -->
+<style>
+  .block {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    color: #fff;
+  }
+
+  .label {
+    width: 100px;
+  }
+
+  .slider {
+    width: 300px;
+  }
+
+  .demonstration {
+    text-align: right;
+    min-width: 30px;
+  }
+
+  #videos {
+    /* display: none; */
+    width: 300px;
+    height: 200px;
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    z-index: 9;
+    overflow: hidden;
+    text-align: center;
+    background-color: black;
+  }
+</style>
+
+</html>
